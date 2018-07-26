@@ -123,7 +123,7 @@ knot_linear_diagn_rate <- function(knot_params, fp){
   
   # knots <- c(1970, 1980, 1986, 1996, 2001, 2009, 2015)
   # theta <- c(0, knot_params)
-  knots <- c(1986, 1996, 2000, 2009, 2015)
+  knots <- c(1986, 1996, 2000, 2005, 2009, 2015)
   theta <- knot_params
   
   
@@ -227,6 +227,15 @@ create_param_csavr <- function(theta, fp){
     p <- theta[1:5]
     p[c(1:2, 4:5)] <- exp(theta[c(1:2, 4:5)])
     fp$incidinput <- idbllogistic(tt, p)
+    nil_poit <- NULL
+  }
+  if(fp$eppmod == "directincid" && fp$incid_func == "incid_logrw"){
+    nparam_incid <- fp$numKnots
+    beta <- theta[1:nparam_incid]
+    t_points_to_sample <- 0:51*10+5
+    incidio <- as.vector(fp$rvec.spldes %*% beta)[t_points_to_sample]
+    
+    fp$incidinput <- incidio
   }
 
   if(fp$eppmod == "rlogistic"){
@@ -238,6 +247,7 @@ create_param_csavr <- function(theta, fp){
   }
 
   if(fp$eppmod == "logrw"){
+    
     nparam_incid <- fp$numKnots + 1L
     beta <- theta[1:fp$numKnots]
 
@@ -362,8 +372,8 @@ return(tot_likelihood)
 
 }
 
-rw_mean <- rep(0.5, 52)
-rw_sd <- rep(0.25, 52)
+rw_incid_prior_shape <- 500
+rw_incid_prior_rate <- 0.001
 
 ilogistic_theta_mean <- c(-1, -10)
 ilogistic_theta_sd <- c(5, 5)
@@ -377,14 +387,14 @@ diagn_theta_sd <- c(5, 5)
 diagn_linear_theta_mean <- rep(0.5, 12)
 diagn_linear_theta_sd <- rep(0.5,12)
 
-diagn_knot_linear_mean <- c(0.1, 0.5, 3, 9, 15)
-diagn_knot_linear_sd <- c(0.05, 0.2, 1, 2, 2.5)
+diagn_knot_linear_mean <- c(0.1, 0.5, 3, 6, 9, 15)
+diagn_knot_linear_sd <- c(0.05, 0.2, 1, 3, 2, 2.5)
 
 logiota_pr_mean <- -13
 logiota_pr_sd <- 5
 
 sample_prior_csavr <- function(n, fp){
-
+  
   mat_eppmod <- sample_prior_eppmod(n, fp)
   if(fp$linear_diagnosis == "12 param"){
     mat_diagn <- sample_prior_piecewise_diagn(n, fp)
@@ -409,6 +419,12 @@ sample_prior_eppmod <- function(n, fp){
     mat[,2:fp$rt$n_rw] <- bayes_rmvt(n, fp$rt$n_rw-1, rw_prior_shape, rw_prior_rate)  # u[2:numKnots]
     mat[,fp$numKnots+1] <- sample_iota(n, fp)
 
+  }else if(fp$eppmod == "directincid" && fp$incid_func == "incid_logrw"){
+    nparam <- fp$numKnots 
+    
+    mat <- matrix(NA, n, nparam)
+    mat[,1] <- rnorm(n, 0.2, 1)  # u[1]
+    mat[,2:fp$rt$n_rw] <- bayes_rmvt(n, fp$rt$n_rw-1, rw_incid_prior_shape , rw_incid_prior_rate)  # u[2:numKnots]
   } else {
 
     theta_mean <- numeric()
@@ -492,6 +508,10 @@ lprior_eppmod <- function(theta_eppmod, fp){
     lpr <- lpr + lprior_iota(theta_eppmod[fp$numKnots+1], fp)
     return(lpr)
   }
+  else if (fp$eppmod == "directincid" && fp$incid_func == "incid_logrw"){
+    lpr <- bayes_lmvt(theta_eppmod[2:fp$numKnots], rw_prior_shape, rw_prior_rate)
+    return(lpr)
+  }
   else
     stop("incidence model not recognized")
 
@@ -506,6 +526,8 @@ get_nparam_eppmod <- function(fp){
     return(length(ilogistic_theta_mean))
   else if(fp$eppmod == "directincid" && fp$incid_func == "idbllogistic")
     return(length(idbllogistic_theta_mean))
+  else if(fp$eppmod == "directincid" && fp$incid_func == "incid_logrw")
+    return(fp$numKnots)
   else if(fp$eppmod == "rlogistic")
     return(length(rlog_pr_mean))
   else if(fp$eppmod == "logrw")
@@ -530,6 +552,7 @@ likelihood_csavr <- function(theta, fp, likdat, log=FALSE){
     lval <- ll_csavr(theta, fp, likdat)
   else
     lval <- unlist(lapply(seq_len(nrow(theta)), function(i) ll_csavr(theta[i,], fp, likdat)))
+  print(i)
   if(log)
     return(lval)
   else

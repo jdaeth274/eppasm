@@ -1,11 +1,11 @@
 prepare_hybrid_r <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5, rw_start=fp$rw_start, rw_dk=NULL){
-  
+
   if(!exists("rtpenord", fp))
     fp$rtpenord <- 2L
-  
+
   if(is.null(rw_start))
     rw_start <- max(fp$proj.steps)
-  
+
   ## if(exists("knots", fp))
   ##   fp$numKnots <- length(fp$knots) - 4
 
@@ -14,33 +14,33 @@ prepare_hybrid_r <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5, rw_st
   rt <- list()
   rt$spline_steps <- fp$proj.steps[fp$proj.steps >= fp$tsEpidemicStart & fp$proj.steps <= rw_start]
   rt$rw_steps <- fp$proj.steps[fp$proj.steps > rw_start & fp$proj.steps <= max(fp$proj.steps)]
-  
+
   rt$nsteps_preepi <- length(fp$proj.steps[fp$proj.steps < tsEpidemicStart])
-  
+
   if(!exists("n_splines", fp))
     n_splines <- 7
   else
     n_splines <- fp$n_splines
-  
+
   if(!exists("n_rw", fp))
     n_rw <- ceiling(diff(range(rt$rw_steps)))  ##
   else
     n_rw <- fp$n_rw
-  
-  
+
+
   rt$n_splines <- n_splines
   rt$n_rw <- n_rw
   rt$n_param <- rt$n_splines+rt$n_rw
-  
+
   fp$numKnots <- rt$n_splines+rt$n_rw
-  
+
   if(rt$n_splines > 0){
     rt$spline_penord <- fp$rtpenord
     proj.dur <- diff(range(rt$spline_steps))
     rvec.knots <- seq(min(rt$spline_steps) - 3*proj.dur/(rt$n_splines-3), max(rt$spline_steps) + 3*proj.dur/(rt$n_splines-3), proj.dur/(rt$n_splines-3))
-    
+
     fp$splineX <- splines::splineDesign(rvec.knots, rt$spline_steps)
-    
+
     m <- matrix(0, rt$n_splines, rt$n_splines)
     m[,1] <- 1
     for(i in 2:rt$n_splines)
@@ -48,11 +48,11 @@ prepare_hybrid_r <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5, rw_st
 
     rt$splineX <- fp$splineX %*% m
   }
-  
+
   ## Random walk design matrix
   if(!is.null(rw_dk))
     rt$rw_knots <- seq(min(rt$rw_steps), max(rt$rw_steps)+rw_dk, by=rw_dk)
-  else 
+  else
     rt$rw_knots <- seq(min(rt$rw_steps), max(rt$rw_steps), length.out=n_rw+1)
   rt$rwX <- outer(rt$rw_steps, rt$rw_knots[1:n_rw], ">=")
   class(rt$rwX) <- "integer"
@@ -63,11 +63,11 @@ prepare_hybrid_r <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5, rw_st
   fp$rvec.spldes <- rbind(matrix(0, rt$nsteps_preepi, fp$numKnots),
                           cbind(rt$splineX, matrix(0, length(rt$spline_steps), n_rw)),
                           cbind(matrix(tail(rt$splineX, 1), nrow=length(rt$rw_steps), ncol=n_splines, byrow=TRUE), rt$rwX))
-                                
+
   if(!exists("eppmod", fp))
     fp$eppmod <- "rhybrid"
   fp$iota <- NULL
-  
+
   return(fp)
 }
 
@@ -86,7 +86,7 @@ prepare_logrw <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5){
     rt$n_rw <- fp$n_rw
 
   fp$numKnots <- rt$n_rw
-  
+
   ## Random walk design matrix
   rt$rw_knots <- seq(min(rw_steps), max(rw_steps), length.out=rt$n_rw+1)
   rt$rwX <- outer(rw_steps, rt$rw_knots[1:rt$n_rw], ">=")
@@ -95,18 +95,18 @@ prepare_logrw <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5){
   fp$rt <- rt
 
   fp$rvec.spldes <- rbind(matrix(0, rt$nsteps_preepi, fp$numKnots), rt$rwX)
-                                
+
   if(!exists("eppmod", fp))
     fp$eppmod <- "logrw"
   fp$iota <- NULL
-  
+
   return(fp)
 }
 
 
 rlog_pr_mean <- c(log(0.35), log(0.09), log(0.2), 1993)
 rlog_pr_sd <- c(0.5, 0.3, 0.5, 5)
-                
+
 rlogistic <- function(t, p){
   ## p[1] = log r(0)    : log r(t) at the start of the epidemic (exponential growth)
   ## p[2] = log r(Inf)  : endemic value for log r(t)
@@ -127,7 +127,7 @@ prepare_rlogistic_rw <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5, r
   rt <- list()
   rt$rlogistic_steps <- fp$proj.steps[fp$proj.steps <= rw_start]
   rt$rw_steps <- fp$proj.steps[fp$proj.steps > rw_start & fp$proj.steps <= max(fp$proj.steps)]
-  
+
   if(!exists("n_rw", fp))
     n_rw <- ceiling(diff(range(rt$rw_steps)))  ##
   else
@@ -135,11 +135,11 @@ prepare_rlogistic_rw <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5, r
 
   rt$n_rw <- n_rw
   rt$n_param <- 4+rt$n_rw  # 4 parameters for rlogistic
-  
+
   ## Random walk design matrix
   if(!is.null(rw_dk))
     rt$rw_knots <- seq(min(rt$rw_steps), max(rt$rw_steps)+rw_dk, by=rw_dk)
-  else 
+  else
     rt$rw_knots <- seq(min(rt$rw_steps), max(rt$rw_steps), length.out=n_rw+1)
   rt$rwX <- pmin(pmax(outer(rt$rw_steps, rt$rw_knots[1:n_rw], "-"), 0), 1)  # piecewise linear interpolation
 
@@ -149,7 +149,7 @@ prepare_rlogistic_rw <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5, r
   if(!exists("eppmod", fp))
     fp$eppmod <- "rlogistic_rw"
   fp$iota <- NULL
-  
+
   return(fp)
 }
 
@@ -184,7 +184,7 @@ extend_projection <- function(fit, proj_years){
 
   if(proj_years > fit$fp$ss$PROJ_YEARS)
     stop("Cannot extend projection beyond duration of projection file")
-  
+
   fp <- fit$fp
   fpnew <- fp
 
@@ -209,15 +209,15 @@ extend_projection <- function(fit, proj_years){
     sh <- fp$prior_args$rw_prior_shape
   else
     sh <- eppasm::rw_prior_shape
-  
+
   if(exists("prior_args", fp) && exists("rw_prior_rate", fp$prior_args))
     rate <- fp$prior_args$rw_prior_rate
   else
     rate <- eppasm::rw_prior_rate
-  
+
   theta <- fit$resample[,idx1:idx2, drop=FALSE]
   fit$rw_sigma <- sqrt(sample_invgamma_post(theta, sh, rate))
-  
+
   nsteps <- fpnew$rt$n_rw - fp$rt$n_rw
 
   if(nsteps > 0){
@@ -255,7 +255,7 @@ calc_rtrend_rt <- function(t, fp, rveclast, prevlast, pop, i, ii){
 
   prevcurr <- hivp.ii / (hivn.ii + hivp.ii)
 
-  
+
   if(t > fp$tsEpidemicStart){
     par <- fp$rtrend
     gamma.t <- if(t < par$tStabilize) 0 else (prevcurr-prevlast)*(t - par$tStabilize) / (fp$ss$DT*prevlast)
@@ -288,7 +288,7 @@ transf_iota <- function(par, fp){
   if(exists("logitiota", fp) && fp$logitiota)
     exp(invlogit(par)*diff(logiota.unif.prior) + logiota.unif.prior[1])
   else
-    exp(par)  
+    exp(par)
 }
 
 lprior_iota <- function(par, fp){
@@ -305,6 +305,7 @@ lprior_iota <- function(par, fp){
 }
 
 sample_iota <- function(n, fp){
+  
   if(exists("prior_args", where = fp)){
     for(i in seq_along(fp$prior_args))
       assign(names(fp$prior_args)[i], fp$prior_args[[i]])

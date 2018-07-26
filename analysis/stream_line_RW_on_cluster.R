@@ -300,4 +300,77 @@ output_test$rate_plot
 
 
 ############################################################################################
-## 
+## Running optim locally ###################################################################
+############################################################################################
+devtools::load_all("C:/Users/josh/Dropbox/hiv_project/eppasm")
+brazil$fp$incid_func <- "Null"
+lof_r_local <- fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e4, optfit = TRUE)
+opt_out <- list(lof_r_local)
+
+knot_increase <- plot_undiagnosed(opt_out,model_labs = c("RW"))
+
+lof_r_local$par
+
+lof_rw_incid_loc <- fitmod_csavr(brazil, incid_func = "incid_logrw", B0 = 5e4, optfit = TRUE)
+
+
+############################################################################################
+## RUN IMIS fits on cluster, updated number of knots #######################################
+############################################################################################
+
+brazil_fit1_updated_art_knot_linear <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrw", B0=1e4,
+                                                                B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                   name = "log_RW_IMIS_fit")
+
+brazil_fit1_updated_art_knot_linear$log()
+brazil_fit1_updated_art_knot_linear$status()
+brazil_fit1_updated_art_knot_linear_id <- brazil_fit1_updated_art_knot_linear$id
+save(brazil_fit1_updated_art_knot_linear_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/SPECTRUM_ART_logrw")
+
+
+brazil_fit2_updated_art_knot_linear <- obj$enqueue(fitmod_csavr(brazil, incid_func = "idbllogistic",
+                                                                B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                   name = "double_log_CD4_diag_deaths_knot_linear")
+brazil_fit2_updated_art_knot_linear$status()
+brazil_fit2_updated_art_knot_linear_id <- brazil_fit2_updated_art_knot_linear$id
+save(brazil_fit2_updated_art_knot_linear_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/SPECTRUM_ART_double_log_incid")
+
+
+## fit logistic model for transimssion rate (r(t))
+brazil_fit3_updated_art_knot_linear <- obj$enqueue(fitmod_csavr(brazil, eppmod="rlogistic", B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                   name = "rlog_CD4_diag_deaths_knot_linear")
+brazil_fit3_updated_art_knot_linear$status()
+brazil_fit3_updated_art_knot_linear_id <- brazil_fit3_updated_art_knot_linear$id
+save(brazil_fit3_updated_art_knot_linear_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/SPECTRUM_ART_r_log")
+
+path_to_victory <- "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/"
+minor_slip_up <- list.files(path_to_victory, full.names = TRUE)
+for(i in 1:length(minor_slip_up))
+  load(minor_slip_up[[i]], verbose = TRUE)
+
+
+
+imis_log_rw <- brazil_fit1_updated_art_knot_linear$result()
+immis_double_log <- brazil_fit2_updated_art_knot_linear$result()
+imis_r_logistic <- brazil_fit3_updated_art_knot_linear$result()
+
+brazil_out1_cd4 <- tidy(brazil_fit1_cd4) %>% data.frame(model = "logistic", .)
+brazil_out2_cd4 <- tidy(brazil_fit2_cd4) %>% data.frame(model = "double logistic", .)
+brazil_out3_cd4 <- tidy(brazil_fit3_cd4) %>% data.frame(model = "rlogistic", .)
+brazil_out_cd4 <- rbind(brazil_out1_cd4, brazil_out2_cd4, brazil_out3_cd4)
+
+
+
+knot_linear_diag_plot <- ggplot(subset(brazil_out_cd4, year %in% 1975:2017), 
+                                aes(year, mean, ymin=lower, ymax=upper, color=model, fill=model)) +
+  geom_line(size=1.05) + geom_ribbon(alpha=0.2) + 
+  facet_wrap(~outcome, scales="free") +
+  geom_point(aes(y=lik_data), col="darkred", size=0.5) +
+  labs(title = "Spectrum ART numbers, RW compo")
+
+
+
+

@@ -56,8 +56,8 @@ plot_undiagnosed <- function(optim_output,diag_start = 1980, art_start = 1996, m
     
     ## Diag rate 
     
-    diag_rate <- optim_output[[i]]$par[(length(optim_output[[i]]$par) - 4) : length(optim_output[[i]]$par)]
-    knots <- c(1986, 1996, 2000, 2009, 2015)
+    diag_rate <- optim_output[[i]]$par[(length(optim_output[[i]]$par) - 5) : length(optim_output[[i]]$par)]
+    knots <- c(1986, 1996, 2000, 2005, 2009, 2015)
     
     diagn_trend <- approx(knots, diag_rate, 1970:2021, rule = 2)$y
     diagn_df <- cbind.data.frame(diagn_trend, rep(input_label[i], 52), c(1970:2021))
@@ -190,6 +190,13 @@ output_test <- plot_undiagnosed(opt_res_list, model_labs = c("RW", "rlog","doubl
 
 output_test$combined_plot
 output_test$rate_plot
+diagn_trend <- approx(c(1986,1996,2000,2005,2009,2015), brazil_opt_RW$par[48:53], 1970:2021, rule = 2)$y
+diagn_trend$time <- c(1970:2021)
 
-
+plot(x= diagn_trend$time, y = diagn_trend[1:52], col = "midnightblue", type = "l")
+abline(v=1986, col ="red")
+abline(v=1996, col ="red")
+abline(v=2000, col ="red")
+abline(v=2005, col ="red")
+abline(v=2009, col ="red")
 
