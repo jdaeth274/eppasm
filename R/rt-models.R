@@ -73,16 +73,29 @@ prepare_hybrid_r <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5, rw_st
 
 
 prepare_logrw <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5){
-
+  
+  single_year_steps <- seq(fp$ss$proj_start, by = 1, length.out = fp$ss$PROJ_YEARS)
   fp$tsEpidemicStart <- fp$proj.steps[which.min(abs(fp$proj.steps - tsEpidemicStart))]
+  if(fp$eppmod == "directincid"){
+    rw_steps <- single_year_steps[single_year_steps >= fp$tsEpidemicStart]
+  }else{
   rw_steps <- fp$proj.steps[fp$proj.steps >= fp$tsEpidemicStart]
+  }
 
   rt <- list()
+  if(fp$eppmod == "directincid"){
+    rt$nsteps_preepi <- length(single_year_steps[single_year_steps < tsEpidemicStart])
+  }else{
   rt$nsteps_preepi <- length(fp$proj.steps[fp$proj.steps < tsEpidemicStart])
+  }
 
-  if(!exists("n_rw", fp))
+  if(!exists("n_rw", fp)){
+    if(fp$eppmod == "directincid"){
+      rt$n_rw <- length(rw_steps)
+    }else{
     rt$n_rw <- ceiling(diff(range(rw_steps)))  ##
-  else
+    }
+  }else
     rt$n_rw <- fp$n_rw
 
   fp$numKnots <- rt$n_rw

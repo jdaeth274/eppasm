@@ -8,13 +8,15 @@ ldinvgamma <- function(x, alpha, beta){
 }
 
 bayes_lmvt <- function(x, shape, rate){
-  mvtnorm::dmvt(x, sigma=diag(length(x)) / (shape / rate), df=2*shape, log=TRUE)
+   mvtnorm::dmvt(x, sigma=diag(length(x)) / (shape / rate), df=2*shape, log=TRUE)
+  
 }
 
 bayes_rmvt <- function(n, d, shape, rate){
   
-  mvtnorm::rmvt(n, sigma=diag(d) / (shape / rate), df=2*shape)
+  a <- mvtnorm::rmvt(n, sigma=diag(d) / (shape / rate), df=2*shape)
   
+  return(a)
 }
 
 ## Binomial distribution log-density permitting non-integer counts

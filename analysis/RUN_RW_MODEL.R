@@ -3,8 +3,8 @@
 #################################################################################################
 
 require(epp)
-devtools::build("path_to_downloaded_eppasm_repo")
-
+devtools::build("C:/Users/josh/Dropbox/hiv_project/eppasm")
+devtools::load_all("C:/Users/josh/Dropbox/hiv_project/eppasm")
 library(magrittr)
 library(broom)
 library(ggplot2)
@@ -13,7 +13,7 @@ library(ggplot2)
 ## Load Brazil file up ##########################################################################
 #################################################################################################
 
-load("path_to_downloaded_brazil_fil", verbose = TRUE)
+load("C:/Users/josh/Dropbox/hiv_project/jeff_eppasm_data/updated_brazil_fp_csavrd", verbose = TRUE)
 
 #################################################################################################
 ## Function for plotting outputs ################################################################
@@ -177,7 +177,7 @@ plot_undiagnosed <- function(optim_output,diag_start = 1980, art_start = 1996, m
 ##################################################################################################
 ## Optim runs ####################################################################################
 ##################################################################################################
-
+brazil$fp$incid_func <- "null"
 brazil_opt_RW <- fitmod_csavr(brazil, eppmod="logrw", B0=1e4, optfit=TRUE)
                        
 brazilo_opt_log_r <- fitmod_csavr(brazil, eppmod="rlogistic", B0=1e4, optfit=TRUE)
@@ -199,4 +199,7 @@ abline(v=1996, col ="red")
 abline(v=2000, col ="red")
 abline(v=2005, col ="red")
 abline(v=2009, col ="red")
+
+log_rw <- list(brazil_opt_RW)
+output_log_rw_test <- plot_undiagnosed(log_rw, model_labs = "RW")
 

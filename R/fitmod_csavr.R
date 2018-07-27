@@ -73,7 +73,7 @@ fitmod_csavr <- function(obj, ..., B0 = 1e5, B = 1e4, B.re = 3000, number_k = 50
   if(fp$eppmod == "logrw" | fp$incid_func == "incid_logrw")
     fp <- prepare_logrw(fp, 1975.5)
 
-  if(fp$eppmod == "logrspline")
+  if(fp$eppmod == "logrspline" | fp$incid_func == "incid_logspline")
     fp <- prepare_rspline_model(fp, tsEpidemicStart=1975.5)
 
 

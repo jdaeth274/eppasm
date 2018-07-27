@@ -230,11 +230,26 @@ create_param_csavr <- function(theta, fp){
     nil_poit <- NULL
   }
   if(fp$eppmod == "directincid" && fp$incid_func == "incid_logrw"){
+    
     nparam_incid <- fp$numKnots
     beta <- theta[1:nparam_incid]
-    t_points_to_sample <- 0:51*10+5
-    incidio <- as.vector(fp$rvec.spldes %*% beta)[t_points_to_sample]
+    
+    
+    incidio <- exp(as.vector(fp$rvec.spldes %*% beta))
+    incidio[1:fp$rt$nsteps_preepi] <- 0
+    incidio <- incidio * 1e-3
 
+    fp$incidinput <- incidio
+  }
+  if(fp$eppmod == "directincid" && fp$incid_func == "incid_logspline"){
+    
+    nparam_incid <- fp$numKnots
+    beta <- theta[1:nparam_incid]
+    
+    
+    incidio <- exp(as.vector(fp$rvec.spldes %*% beta))
+    incidio[1:fp$pre_epi_steps] <- 0
+    
     fp$incidinput <- incidio
   }
 
@@ -249,7 +264,7 @@ create_param_csavr <- function(theta, fp){
   if(fp$eppmod %in% c("logrw", "logrspline")){
     nparam_incid <- fp$numKnots + 1L
     beta <- theta[1:fp$numKnots]
-
+    
     param <- list(beta = beta,
                   rvec = exp(as.vector(fp$rvec.spldes %*% beta)),
                   iota = transf_iota(theta[fp$numKnots+1], fp))
@@ -372,8 +387,11 @@ return(tot_likelihood)
 
 }
 
-rw_incid_prior_shape <- 500
-rw_incid_prior_rate <- 0.001
+rw_incid_prior_shape <- 3#300
+rw_incid_prior_rate <- 4#40000
+
+sp_incid_prior_shape <- 3
+sp_incid_prior_rate <- 500
 
 ilogistic_theta_mean <- c(-1, -10, 1995)
 ilogistic_theta_sd <- c(5, 5, 10)
@@ -410,7 +428,7 @@ sample_prior_csavr <- function(n, fp){
 }
 
 sample_prior_eppmod <- function(n, fp){
-
+  
   if(fp$eppmod == "logrw"){
     nparam <- fp$numKnots + 1L
 
@@ -430,10 +448,19 @@ sample_prior_eppmod <- function(n, fp){
 
   }else if(fp$eppmod == "directincid" && fp$incid_func == "incid_logrw"){
     nparam <- fp$numKnots
-
+    
     mat <- matrix(NA, n, nparam)
     mat[,1] <- rnorm(n, 0.2, 1)  # u[1]
     mat[,2:fp$rt$n_rw] <- bayes_rmvt(n, fp$rt$n_rw-1, rw_incid_prior_shape , rw_incid_prior_rate)  # u[2:numKnots]
+    
+  }else if(fp$eppmod == "directincid" && fp$incid_func == "incid_logspline"){
+    
+    nparam <- fp$numKnots
+    
+    mat <- matrix(NA, n, nparam)
+    mat[,1] <- rnorm(n, 0.2, 1)
+    mat[,2:fp$numKnots] <- bayes_rmvt(n, fp$numKnots -1, sp_incid_prior_shape, sp_incid_prior_rate) ## may have to look at these priors
+    
   } else {
 
     theta_mean <- numeric()
@@ -505,7 +532,7 @@ lprior_csavr <- function(theta, fp){
 }
 
 lprior_eppmod <- function(theta_eppmod, fp){
-
+  
   if(fp$eppmod == "directincid" && fp$incid_func == "ilogistic")
     return(sum(dnorm(theta_eppmod, ilogistic_theta_mean, ilogistic_theta_sd, log=TRUE)))
   else if(fp$eppmod == "directincid" && fp$incid_func == "idbllogistic")
@@ -517,8 +544,12 @@ lprior_eppmod <- function(theta_eppmod, fp){
     lpr <- lpr + lprior_iota(theta_eppmod[fp$numKnots+1], fp)
     return(lpr)
   } else if(fp$eppmod == "logrspline"){
-    lpr <- bayes_lmvt(theta_eppmod[rsp$fp$rtpenord:fp$numKnots], tau2_prior_shape, tau2_prior_rate)
+    lpr <- bayes_lmvt(theta_eppmod[fp$rtpenord:fp$numKnots], tau2_prior_shape, tau2_prior_rate)
     lpr <- lpr + lprior_iota(theta_eppmod[fp$numKnots+1], fp)
+    return(lpr)
+  }
+  else if (fp$eppmod == "directincid" && fp$incid_func == "incid_logspline"){
+    lpr <- bayes_lmvt(theta_eppmod[fp$rtpenord:fp$numKnots], tau2_prior_shape, tau2_prior_rate)
     return(lpr)
   }
   else if (fp$eppmod == "directincid" && fp$incid_func == "incid_logrw"){
@@ -540,6 +571,8 @@ get_nparam_eppmod <- function(fp){
   else if(fp$eppmod == "directincid" && fp$incid_func == "idbllogistic")
     return(length(idbllogistic_theta_mean))
   else if(fp$eppmod == "directincid" && fp$incid_func == "incid_logrw")
+    return(fp$numKnots)
+  else if(fp$eppmod == "directincid" && fp$incid_func == "incid_logspline")
     return(fp$numKnots)
   else if(fp$eppmod == "rlogistic")
     return(length(rlog_pr_mean))
@@ -565,7 +598,7 @@ likelihood_csavr <- function(theta, fp, likdat, log=FALSE){
     lval <- ll_csavr(theta, fp, likdat)
   else
     lval <- unlist(lapply(seq_len(nrow(theta)), function(i) ll_csavr(theta[i,], fp, likdat)))
-  print(i)
+  
   if(log)
     return(lval)
   else

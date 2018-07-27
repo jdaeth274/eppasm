@@ -279,18 +279,32 @@ prepare_rspline_model <- function(fp, numKnots=NULL, tsEpidemicStart=fp$ss$time_
     fp$numKnots <- 7
 
   fp$tsEpidemicStart <- fp$proj.steps[which.min(abs(fp$proj.steps - tsEpidemicStart))]
+  single_year_steps <- seq(fp$ss$proj_start, by = 1, length.out = fp$ss$PROJ_YEARS)
+  if(fp$eppmod == "logrspline"){
   epi_steps <- fp$proj.steps[fp$proj.steps >= fp$tsEpidemicStart]
+  }else{
+    epi_steps <- single_year_steps[single_year_steps >= fp$tsEpidemicStart] 
+  }
   proj.dur <- diff(range(epi_steps))
   rvec.knots <- seq(min(epi_steps) - 3*proj.dur/(fp$numKnots-3), max(epi_steps) + 3*proj.dur/(fp$numKnots-3), proj.dur/(fp$numKnots-3))
+  if(fp$eppmod == "logrspline"){
   fp$rvec.spldes <- rbind(matrix(0, length(fp$proj.steps) - length(epi_steps), fp$numKnots),
                           splines::splineDesign(rvec.knots, epi_steps))
+  }else{
+    fp$rvec.spldes <- rbind(matrix(0, length(single_year_steps) - length(epi_steps), fp$numKnots),
+                            splines::splineDesign(rvec.knots, epi_steps))
+  }
 
   if(!exists("rtpenord", fp))
     fp$rtpenord <- 2L
   if(!exists("eppmod", fp))
     fp$eppmod <- "rspline"
   fp$iota <- NULL
-
+  if(fp$incid_func == "incid_logspline"){
+  fp$pre_epi_steps <- length(single_year_steps) - length(epi_steps)
+  }
+  
+  
   return(fp)
 }
 

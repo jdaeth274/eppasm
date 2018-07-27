@@ -103,7 +103,7 @@ brazil$fp$artcd4elig_idx <- rep(1L, 52)
 ## Lets get our function for plotting the resulting trends ###############################################
 ##########################################################################################################
 
-plot_undiagnosed <- function(optim_output,diag_start = 1980, art_start = 1996, model_labs){
+plot_undiagnosed <- function(optim_output,diag_start = 1980, art_start = 1996, model_labs, xlimits = c(1970,2015)){
   tot_undiag_data <- NULL
   input_label <- model_labs
   tot_deaths <- NULL
@@ -220,30 +220,31 @@ plot_undiagnosed <- function(optim_output,diag_start = 1980, art_start = 1996, m
   undiag_plot <- ggplot(data = tot_undiag_data,aes(x=year,y=undiagnosed,group=input))+geom_line(aes(colour=input),size=1.05)+
     labs(x="Time",y="Percent of HIV +ve population undiagnosed") + 
     geom_vline(xintercept = diag_start,col="midnightblue",size = 0.75) +
-    geom_vline(xintercept = art_start,col="midnightblue",size=0.75) + coord_cartesian(ylim = c(0,100))
+    geom_vline(xintercept = art_start,col="midnightblue",size=0.75) + coord_cartesian(ylim = c(0,100), xlim = xlimits)
   
   deaths_plot <- ggplot(data = tot_deaths, aes(x = year, y =deaths, group = input)) + geom_line(aes(colour = input), size = 1.05)+
     geom_point(aes(x = year, y = aidsdeaths), colour = "midnightblue", size = 1.5) +
-    labs(x = "Time", y= "Number of AIDS deaths")
+    labs(x = "Time", y= "Number of AIDS deaths") + coord_cartesian(xlim = xlimits, ylim = c(0, 30000))
   
   diagnoses_plots <- ggplot(data = tot_diagnoses, aes(x = year, y = diagnoses, group = input)) +
     geom_line(aes(colour = input), size = 1.05)+
     geom_point(aes(x = year, y = total_cases), size = 1.5, colour = "midnightblue")+
-    labs(x = "Time", y = "Diagnoses")
+    labs(x = "Time", y = "Diagnoses")  + coord_cartesian(xlim = xlimits, ylim = c(0, 70000))
   
   diag_rate_plot <- ggplot(data = tot_diag_rate, aes(x = year, y = rate, group = input)) + geom_line(aes(colour = input), size = 1.05)+
-    labs(x = "time", y = "rate")
+    labs(x = "time", y = "rate")  + coord_cartesian(xlim = xlimits, ylim = c(0, 20))
   
   art_init_rate_plot <- ggplot(data = art_init_tot, aes(x = time, y = val, group = cat_input)) +
     geom_line(aes(colour = cat, linetype = input), size = 1.01) +
-    labs(x = "time", y = "init numbers per class")
+    labs(x = "time", y = "init numbers per class")  + coord_cartesian(xlim = xlimits, ylim = c(0, 20000))
+  
   tot_divided_plot <- ggplot(data = tot_divided, aes(x = time, y = deaths, group = class_input)) +
     geom_line(aes(colour = class, linetype = input), size = 1.01) +
-    labs(x = "time", y = "deaths from AIDS")
+    labs(x = "time", y = "deaths from AIDS")  + coord_cartesian(xlim = xlimits, ylim = c(0, 20000))
   
   tot_incid_plot <- ggplot(data = tot_incid, aes(x = time, y = incidence, group = input)) +
     geom_line(aes(colour = input), size = 1.02) +
-    labs(x = "time", y = "incidence")
+    labs(x = "time", y = "incidence") + coord_cartesian(xlim = xlimits, ylim = c(0, 1e-03))
   
   combined_plot <- ggpubr::ggarrange(undiag_plot, deaths_plot, diagnoses_plots,
                                      tot_incid_plot, art_init_rate_plot, tot_divided_plot,
@@ -302,17 +303,37 @@ output_test$rate_plot
 ############################################################################################
 ## Running optim locally ###################################################################
 ############################################################################################
-devtools::load_all("C:/Users/josh/Dropbox/hiv_project/eppasm")
+
 brazil$fp$incid_func <- "Null"
-lof_r_local <- fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e4, optfit = TRUE)
-opt_out <- list(lof_r_local)
+lof_r_local <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e4, optfit = TRUE),
+                           name = "RW_on_R_optim")
+lof_r_local$status()
 
-knot_increase <- plot_undiagnosed(opt_out,model_labs = c("RW"))
+lof_rw_incid_loc <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logrw", B0 = 1e4, optfit = TRUE),
+                                name = "RW_on_incid_optim")
+lof_rw_incid_loc$status()
+lof_rw_incid_loc$log()
 
-lof_r_local$par
+lof_spline_r <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrspline", B0 = 1e4, optfit = TRUE),
+                            name = "Spline_on_R_optim")
+lof_spline_r$status()
 
-lof_rw_incid_loc <- fitmod_csavr(brazil, incid_func = "incid_logrw", B0 = 5e4, optfit = TRUE)
+lof_spline_incid <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logspline", B0 = 1e4, optfit = TRUE),
+                                name = "Spline_on_incid_optim")
+lof_spline_incid$status()
 
+rw_on_inc_ouput <- list(and_here_i_lay, lof_r_local$result(),
+                        lof_spline_incid$result(),lof_spline_r$result())
+
+this_is_my_rock <- plot_undiagnosed(rw_on_inc_ouput, model_labs = c("RW_on_incid","RW_on_R","Spline_on_incid", "spline_on_r"),
+                                    xlimits = c(1970,2021))
+this_is_my_rock$combined_plot
+
+devtools::load_all("C:/Users/josh/Dropbox/hiv_project/eppasm")
+
+and_here_i_lay <- fitmod_csavr(brazil, incid_func = "incid_logrw", B0 = 1e4, optfit = TRUE)
+
+punctured_bicycle <- fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e4, optfit = TRUE)
 
 ############################################################################################
 ## RUN IMIS fits on cluster, updated number of knots #######################################
@@ -351,15 +372,17 @@ minor_slip_up <- list.files(path_to_victory, full.names = TRUE)
 for(i in 1:length(minor_slip_up))
   load(minor_slip_up[[i]], verbose = TRUE)
 
-
+brazil_fit1_updated_art_knot_linear <- obj$task_get(brazil_fit1_updated_art_knot_linear_id)
+brazil_fit2_updated_art_knot_linear <- obj$task_get(brazil_fit2_updated_art_knot_linear_id)
+brazil_fit3_updated_art_knot_linear <- obj$task_get(brazil_fit3_updated_art_knot_linear_id)
 
 imis_log_rw <- brazil_fit1_updated_art_knot_linear$result()
 immis_double_log <- brazil_fit2_updated_art_knot_linear$result()
 imis_r_logistic <- brazil_fit3_updated_art_knot_linear$result()
 
-brazil_out1_cd4 <- tidy(brazil_fit1_cd4) %>% data.frame(model = "logistic", .)
-brazil_out2_cd4 <- tidy(brazil_fit2_cd4) %>% data.frame(model = "double logistic", .)
-brazil_out3_cd4 <- tidy(brazil_fit3_cd4) %>% data.frame(model = "rlogistic", .)
+brazil_out1_cd4 <- tidy(imis_log_rw) %>% data.frame(model = "R-logRW", .)
+brazil_out2_cd4 <- tidy(immis_double_log) %>% data.frame(model = "double logistic", .)
+brazil_out3_cd4 <- tidy(imis_r_logistic) %>% data.frame(model = "rlogistic", .)
 brazil_out_cd4 <- rbind(brazil_out1_cd4, brazil_out2_cd4, brazil_out3_cd4)
 
 
