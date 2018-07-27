@@ -73,7 +73,7 @@ prepare_hybrid_r <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5, rw_st
 
 
 prepare_logrw <- function(fp, tsEpidemicStart=fp$ss$time_epi_start+0.5){
-
+  browser()
   fp$tsEpidemicStart <- fp$proj.steps[which.min(abs(fp$proj.steps - tsEpidemicStart))]
   rw_steps <- fp$proj.steps[fp$proj.steps >= fp$tsEpidemicStart]
 
@@ -305,7 +305,6 @@ lprior_iota <- function(par, fp){
 }
 
 sample_iota <- function(n, fp){
-  
   if(exists("prior_args", where = fp)){
     for(i in seq_along(fp$prior_args))
       assign(names(fp$prior_args)[i], fp$prior_args[[i]])
