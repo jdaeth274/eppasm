@@ -193,10 +193,24 @@ test_fp$diagn_rate <- array(cd4_rel_diagn,
 test_fp$diagn_rate <- sweep(test_fp$diagn_rate, 4, diagn_trend, "*")
 
 
+##################################################################################################
+## Testing out a seven knot spline for the diagnosis rate ########################################
+##################################################################################################
+
+nk <- 9 # number of splines
+dk <- diff(range(seq(1970,2021,0.1)))/(nk-3)
+knots <- c(1931.75,1944.5,1957.25,1970, 1980, 1985, 2001, 2009, 2015, 2021, 2033.75, 2046.5, 2059.25)#1970 + -3:nk*dk
+step_vector <- seq(1970,2021,0.1)
+
+Xsp <- splines::splineDesign(knots, step_vector , ord=4)
+Dsp1 <- diff(diag(nk), diff=1)
+
+out <- Xsp %*% 
+plot(out)
+qbeta()
 
 
-
-
+which(step_vector == 2015)#,2001,2009,2015))
 
 
 

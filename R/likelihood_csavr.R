@@ -119,6 +119,36 @@ calc_artinits <- function(mod, fp){
 
 }
 
+spline_diagn_rate <- function(knot_params, fp){
+  
+  ### We'll use the splines package and create a 9 knot spline to approximate diagnosis rate 
+  
+  nk <- 9 # number of splines
+  dk <- diff(range(seq(1970,2021,0.1)))/(nk-3)
+  knots <- c(1931.75,1944.5,1957.25,1970, 1980, 1985, 2001, 2009, 2015, 2021, 2033.75, 2046.5, 2059.25)#1970 + -3:nk*dk
+  step_vector <- seq(1970,2021,0.1)
+  
+  Xsp <- splines::splineDesign(knots, step_vector , ord=4)
+  Dsp1 <- diff(diag(nk), diff=1)
+  
+  betas <- c(0,0,knot_params)
+  
+  out <- Xsp %*% betas
+  
+  out <- out[0:51*10+1]
+  
+  ### now we'll take this rate as equal to one cd4 class and then multiply it by relative mortality
+  
+  cd4_rel_diagn <- fp$cd4_mort / fp$cd4_mort[5, 4, 1]
+  
+  fp$diagn_rate <- array(cd4_rel_diagn,
+                         c(fp$ss$hDS, fp$ss$hAG, fp$ss$NG, fp$ss$PROJ_YEARS))
+  fp$diagn_rate <- sweep(fp$diagn_rate, 4, out, "*")
+  
+  return(fp)
+  
+}
+
 knot_linear_diagn_rate <- function(knot_params, fp){
 
   # knots <- c(1970, 1980, 1986, 1996, 2001, 2009, 2015)
@@ -272,20 +302,30 @@ create_param_csavr <- function(theta, fp){
   }
 
   if(fp$linear_diagnosis == "gamma"){
+  
   fp$gamma_max <- exp(theta[nparam_incid+1])
   fp$delta_rate <- exp(theta[nparam_incid+2])
+    
 
   fp <- cumgamma_diagn_rate(fp$gamma_max, fp$delta_rate, fp)
   }
   if(fp$linear_diagnosis == "12 param"){
-    linear_params <- theta[nparam_incid+1:(length(theta)-nparam_incid)]
+    diag_theta_idx <- seq(from = nparam_incid + 1, length.out = length(diagn_linear_theta_mean), by = 1)
+    linear_params <- theta[diag_theta_idx]
 
     fp <- cumulative_linear_diagn_rate(linear_params, fp)
   }
   if(fp$linear_diagnosis == "knot_linear"){
-    knot_params <- theta[nparam_incid+1:(length(theta) - nparam_incid)]
+    diag_theta_idx <- seq(from = nparam_incid + 1, length.out = length(diagn_knot_linear_mean), by = 1)
+    knot_params <- theta[diag_theta_idx]
 
     fp <- knot_linear_diagn_rate(knot_params, fp)
+  }
+  if(fp$linear_diagnosis == "spline"){
+    diag_theta_idx <- seq(from = nparam_incid + 1, length.out = length(spline_diagn_mean), by = 1)
+    knot_params <- theta[diag_theta_idx]
+    
+    fp <- spline_diagn_rate(knot_params, fp)
   }
 
   fp
@@ -293,7 +333,11 @@ create_param_csavr <- function(theta, fp){
 
 #' Log-liklihood for new diagnoses and AIDS deaths and ART inits if want to use that
 ll_csavr <- function(theta, fp, likdat){
-
+  
+  if(fp$neg_binom == TRUE){
+    phi_deaths <- theta[length(theta)-1]
+    phi_diagnoses <- theta[length(theta)]
+  }
   fp <- create_param_csavr(theta, fp)
 
   mod <- simmod(fp)
@@ -304,8 +348,14 @@ ll_csavr <- function(theta, fp, likdat){
 
   mod_aidsdeaths <- colSums(attr(mod, "hivdeaths"),,2) ## getting some odd NAs in here sometimes, for the moment lets let NA = 0
   # mod_aidsdeaths[is.na(mod_aidsdeaths)] <- 0
-
+  if(fp$neg_binom == TRUE){
+  ll_aidsdeaths <- with(likdat$aidsdeaths, sum(dnbinom(x = aidsdeaths,
+                                                       size = phi_deaths,
+                                                       mu = mod_aidsdeaths[idx] * (1 - prop_undercount),
+                                                       log = T)))
+  }else{
   ll_aidsdeaths <- with(likdat$aidsdeaths, sum(dpois(aidsdeaths, mod_aidsdeaths[idx] * (1 - prop_undercount), log=TRUE)))
+  }
   }
 
   ll_diagnoses <- 0
@@ -314,8 +364,17 @@ ll_csavr <- function(theta, fp, likdat){
   mod_diagnoses <- calc_diagnoses(mod, fp)
 
   if(fp$likelihood_cd4 == F){
-
-  ll_diagnoses <- with(likdat$diagnoses, sum(dpois(diagnoses, mod_diagnoses[idx] * (1 - prop_undercount), log=TRUE)))
+    if(fp$neg_binom == FALSE){
+      ll_diagnoses <- with(likdat$diagnoses, sum(dpois(diagnoses, mod_diagnoses[idx] * (1 - prop_undercount), log=TRUE)))
+    }else{
+      ll_diagnoses <- with(likdat$diagnoses, sum(dnbinom(x = diagnoses,
+                                                         mu = mod_diagnoses[idx] * (1 - prop_undercount),
+                                                         size = phi_diagnoses, log=TRUE)))
+      
+    }
+    
+  
+  
 
   }else{
     ## So what I'm doing here is first using cases when we have no cd4 counts, so I extract those years from the data and model
@@ -336,8 +395,14 @@ ll_csavr <- function(theta, fp, likdat){
     # pre_cd4_mod_vals[is.nan(pre_cd4_mod_vals)] <- 0
     # pre_cd4_mod_vals[is.na(pre_cd4_mod_vals)] <- 0
     #
-
+    if(fp$neg_binom == FALSE){
     ll_diagnoses <- with(pre_cd4_data, sum(dpois(total_cases, pre_cd4_mod_vals[idx], log=TRUE)))
+    } else {
+      ll_diagnoses <- with(pre_cd4_data, sum(dnbinom(x = total_cases,
+                                                     mu = pre_cd4_mod_vals[idx],
+                                                     size = phi_diagnoses,
+                                                     log = TRUE)))
+    }
 
    ## Now from 2001 onwards we have cd4 counts, so below I extract the data from 2001 onwards from both data frames
    ## then I use the fact the model data only has 4 levels, and calculate the likelihood for each stage and add this
@@ -351,8 +416,15 @@ ll_csavr <- function(theta, fp, likdat){
       index_to_check <- c(1:nrow(likdat_stage))
 
       col_index <- i + 3
-
+      
+      if(fp$neg_binom == FALSE){
       ll_diagnoses_current_stage <- sum(dpois(likdat_stage[,col_index], mod_stage$diagnoses[index_to_check], log = T))
+      }else{
+        ll_diagnoses_current_stage <- sum(dnbinom(x = likdat_stage[, col_index],
+                                                 mu = mod_stage$diagnoses[index_to_check],
+                                                 size = phi_diagnoses,
+                                                 log = TRUE))
+      }
 
       ll_diagnoses <- ll_diagnoses + ll_diagnoses_current_stage
     }
@@ -408,8 +480,14 @@ diagn_linear_theta_sd <- rep(0.5,12)
 diagn_knot_linear_mean <- c(0.1, 0.5, 3, 6, 9, 15)
 diagn_knot_linear_sd <- c(0.05, 0.2, 1, 3, 2, 2.5)
 
+spline_diagn_mean <- c(0.001, 0.1, 0.5, 3, 6, 9, 15)
+spline_diagn_sd <- c(0.01, 0.05, 0.2, 1, 3, 2, 2.5)
+
 logiota_pr_mean <- -13
 logiota_pr_sd <- 5
+
+phi_mean <- c(10,10)
+phi_sd <- c(5,5)
 
 sample_prior_csavr <- function(n, fp){
 
@@ -423,8 +501,17 @@ sample_prior_csavr <- function(n, fp){
   if(fp$linear_diagnosis == "knot_linear"){
     mat_diagn <- sample_prior_knot_diagn(n, fp)
   }
-
-  cbind(mat_eppmod, mat_diagn)
+  if(fp$linear_diagnosis == "spline"){
+    mat_diagn <- sample_prior_spline_diagn(n, fp)
+  }
+  if(fp$neg_binom == TRUE){
+    mat_phi <- sample_prior_phi(n, fp)
+    out_mat <- cbind(mat_eppmod, mat_diagn, mat_phi)
+  }else{
+    out_mat <- cbind(mat_eppmod, mat_diagn)
+  }
+  
+  return(out_mat)
 }
 
 sample_prior_eppmod <- function(n, fp){
@@ -521,14 +608,47 @@ sample_prior_knot_diagn <- function(n, fp){
   mat
 }
 
+sample_prior_spline_diagn <- function(n, fp){
+  
+  nparma <- length(spline_diagn_mean)
+  val <- rnorm(n * nparma, spline_diagn_mean, spline_diagn_sd)
+  mat <- t(matrix(val, nparma, n))
+  
+  mat
+}
+
+sample_prior_phi <- function(n, fp){
+  nparam <- length(phi_mean)
+  val <- rnorm(n * nparam, phi_mean, phi_sd)
+  mat <- t(matrix(val, nparam, n))
+  
+  return(mat)
+  
+}
 
 lprior_csavr <- function(theta, fp){
-
+  
   nparam_eppmod <- get_nparam_eppmod(fp)
-  nparam_diagn <- 2L
+  if(fp$linear_diagnosis == "gamma")
+    nparam_diagn <- 2L
+  if(fp$linear_diagnosis == "knot_linear")
+    nparam_diagn <- length(diagn_knot_linear_mean)
+  if(fp$linear_diagnosis == "12 param")
+    nparam_diagn <- length(diagn_linear_theta_mean)
+  if(fp$linear_diagnosis == "spline")
+    nparam_diagn <- length(spline_diagn_mean)
+  if(fp$neg_binom == TRUE){
+    nparam_phi <- length(phi_mean)
+    
+    out_vals <- lprior_eppmod(theta[1:nparam_eppmod], fp) +
+      lprior_diagn(theta[(nparam_eppmod + 1):(length(theta) - nparam_phi)], fp) +
+      lprior_phi(theta[(length(theta)-(length(nparam_phi)-1)):length(theta)], fp)
+  }else{
 
-  lprior_eppmod(theta[1:nparam_eppmod], fp) +
-    lprior_diagn(theta[nparam_eppmod + 1:nparam_diagn])
+  out_vals <- lprior_eppmod(theta[1:nparam_eppmod], fp) + 
+    lprior_diagn(theta[(nparam_eppmod + 1):length(theta)], fp)
+  }
+  return(out_vals)
 }
 
 lprior_eppmod <- function(theta_eppmod, fp){
@@ -562,8 +682,29 @@ lprior_eppmod <- function(theta_eppmod, fp){
 }
 
 lprior_diagn <- function(theta_diagn, fp){
-  sum(dnorm(theta_diagn, diagn_theta_mean, diagn_theta_sd, log=TRUE))
+  
+  if(fp$linear_diagnosis == "gamma")
+    a <- sum(dnorm(theta_diagn, diagn_theta_mean, diagn_theta_sd, log=TRUE))
+  
+  if(fp$linear_diagnosis == "12 param")
+    a <- sum(dnorm(theta_diagn, diagn_linear_theta_mean, diagn_linear_theta_sd, log = TRUE))
+  
+  if(fp$linear_diagnosis == "knot_linear")
+    a <- sum(dnorm(theta_diagn, diagn_knot_linear_mean, diagn_knot_linear_sd, log = TRUE))
+  
+  if(fp$linear_diagnosis == "spline")
+    a <- sum(dnorm(theta_diagn, spline_diagn_mean, spline_diagn_sd, log = TRUE))
+  
+  return(a)
 }
+
+lprior_phi <- function(theta_phi, fp){
+  a <- sum(dnorm(theta_phi, phi_mean, phi_sd, log = TRUE))
+  
+  return(a)
+  
+}
+
 
 get_nparam_eppmod <- function(fp){
   if(fp$eppmod == "directincid" && fp$incid_func == "ilogistic")
