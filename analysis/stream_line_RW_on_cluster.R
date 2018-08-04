@@ -14,9 +14,9 @@ didehpc::didehpc_config()
 
 context::context_log_start()
 
-root <- "contexts_2"
+root <- "contexts_3"
 
-ctx<- context::context_save(root, packages = c("epp","eppasm","anclik"), 
+ctx<- context::context_save(root, packages = c("epp","eppasm","anclik","ggplot2","splines"), 
                             package_sources = provisionr::package_sources(local = c("C:/Users/josh/Dropbox/hiv_project/eppasm",
                                                                                     "C:/Users/josh/Dropbox/hiv_project/epp",
                                                                                     "C:/Users/josh/Dropbox/hiv_project/anclik/anclik")))
@@ -477,6 +477,8 @@ save(splines_on_kappa_out,
 ############################################################################################
 ## Now lets set up the same as above but for the incid runs ################################
 ############################################################################################
+brazil$fp$linear_diagnosis <- "knot_linear"
+brazil$fp$neg_binom <- FALSE
 
 sp_incid_15_1 <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logspline", numKnots = 15,
                                           rtpenord = 1, B0 = 2e4, optfit = TRUE),
@@ -514,9 +516,16 @@ splines_on_incid_out <- list(sp_incid_15_1$result(), sp_incid_15_2$result(),
 splines_on_incid <- plot_undiagnosed(splines_on_incid_out, model_labs = c("15_knot_pen_1","15_knot_pen_2",
                                                                           "7_knot_pen_1","7_knot_pen_2"))
 splines_on_incid$combined_plot
+ggpubr::annotate_figure(splines_on_incid$combined_plot,
+                        top = ggpubr::text_grob("Comparison of knot number with fit, splines on incidence",
+                                                color = "red", size = 14))
+
 
 save(splines_on_incid_out,
      file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_results/optim_29_7_2018/sp_15_and_7_on_INCID_results")
+load("C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_results/optim_29_7_2018/sp_15_and_7_on_INCID_results",
+     verbose = TRUE)
+
 
 ############################################################################################
 ## RUN IMIS fits on cluster, updated number of knots #######################################
@@ -749,8 +758,17 @@ list_of_res <- list(local_test_optim, local_test_optim_binom)
 
 outty <- plot_undiagnosed(list_of_res, model_labs = c("poisson","neg_binom"))
 
+devtools::load_all("C:/Users/josh/Dropbox/hiv_project/eppasm")
 
-loccy_test_binom <- fitmod_csavr(brazil, incid_func ="ilogistic", B0 = 1e4, optfit = TRUE)
+brazil$fp$linear_diagnosis <- "spline"
+brazil$fp$neg_binom <- FALSE
+
+loccy_test_binom <- fitmod_csavr(brazil, eppmod ="rlogistic", B0 = 1e3, optfit = TRUE)
+loccy_test_binom_2 <- fitmod_csavr(brazil, incid_func = "incid_logspline", B0 =1e4, optfit = TRUE)
+
+nelder_mead <- list(loccy_test_binom, loccy_test_binom_2)
+nm_out <- plot_undiagnosed(nelder_mead, model_labs = c("rlog","incid_spline"), knot_linear = FALSE)
+
 
 #####################################################################################
 ## Re do the spline and knot linear runs from previously as csavr updated ###########
@@ -761,16 +779,16 @@ brazil$fp$linear_diagnosis <- "spline"
 test_optim_1 <- obj$enqueue(fitmod_csavr(brazil, incid_func = "idbllogistic", B0 = 1e4, optfit = TRUE),
                             name = "double_log_spline_diagn")
 
-test_optim_2 <- obj$enqueue(fitmod_csavr(brazil, eppmod = "rlogistic", B0 = 1e6, optfit = TRUE),
+test_optim_2 <- obj$enqueue(fitmod_csavr(brazil, eppmod = "rlogistic", B0 = 1e4, optfit = TRUE),
                             name = "rlog_spline_diagn")
 
-test_optim_3 <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logrw", B0 = 1e6, optfit = TRUE),
+test_optim_3 <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logrw", B0 = 1e4, optfit = TRUE),
                             name = "rw_incid_spline_diagn")
 
-test_optim_4 <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e6, optfit = TRUE),
+test_optim_4 <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e4, optfit = TRUE),
                             name = "rw_kappa_spline_diagn")
 
-test_optim_5 <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logspline", B0 = 1e6, optfit = TRUE),
+test_optim_5 <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logspline", B0 = 1e4, optfit = TRUE),
                             name = "spline_incid_spline_diagn")
 
 test_optim_6 <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrspline", B0 = 1e4, optfit = TRUE),
@@ -800,12 +818,13 @@ save(id_5,
 
 path_name <- "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/"
 clust_ids <- list.files(path_name, full.names = T)
-for(i in 1:3)
+for(i in 1:4)
   load(clust_ids[[i+19]], verbose = T)
 
 test_optim_2 <- obj$task_get(id_2)
 test_optim_3 <- obj$task_get(id_3)
 test_optim_4 <- obj$task_get(id_4)
+test_optim_5 <- obj$task_get(id_5)
 
 optims <- list(test_optim_1$result(), test_optim_2$result(), test_optim_3$result(), 
                test_optim_4$result(), test_optim_5$result(), test_optim_6$result())
@@ -862,8 +881,29 @@ opto_outo$rate_plot
 
 #### RWs only 
 
-knot_poiss_rws <- optims_knot[]
+knot_poiss_rws <- optims_knot[3:4]
+knot_rw_poiss_out <- plot_undiagnosed(knot_poiss_rws, model_labs = c("Incidence Rw","Kappa RW"))
+knot_rw_poiss_out$combined_plot
+knot_rw_poiss_out$rate_plot
+knot_rw_poiss_out$incid_plot + coord_cartesian(ylim = NULL)
 
+#### splines only 
+
+knot_poiss_sps <- optims_knot[5:6]
+knot_sp_poiss_out <- plot_undiagnosed(knot_poiss_sps, model_labs = c("Incidence spline","Kappa spline"))
+knot_sp_poiss_out$combined_plot
+knot_sp_poiss_out$rate_plot
+
+##### splines and RWs only 
+
+knot_poiss_sps_rws <- optims_knot[3:6]
+knot_poiss_sps_rws_out <- plot_undiagnosed(knot_poiss_sps_rws, model_labs = c("Incidence RW", "Kappa RW",
+                                                                                  "Incidence spline", "kappa spline"))
+
+knot_poiss_sps_rws_out$incid_plot + coord_cartesian(ylim = c(0,0.001), xlim = c(1970,2016))
+
+knot_poiss_sps_rws_out$combined_plot
+knot_poiss_sps_rws_out$rate_plot
 
 #############################################################################################
 ## Runnning the neg binom models on the cluster #############################################
@@ -964,5 +1004,578 @@ optims_knot_neg <- list(test_optim_1_knot_neg$result(), test_optim_2_knot_neg$re
 
 save(optims_knot_neg,
      file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_results/optim_31_7_2018/6_inicd_meths_knot_NEG_diag")
+
+load("C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_results/optim_31_7_2018/6_inicd_meths_KNOT_NEG_diag",
+     verbose = T)
+
+opto_outo_neg <- plot_undiagnosed(optims_knot_neg, model_labs = c("double_log","rlogistic","incid_rw","kappa_rw",
+                                                          "incid_spline", "kappa_spline"))
+
+opto_outo_neg$combined_plot
+opto_outo_neg$rate_plot
+
+#### RWs only 
+
+knot_poiss_rws_neg <- optims_knot_neg[3:4]
+knot_rw_poiss_out_neg <- plot_undiagnosed(knot_poiss_rws_neg, model_labs = c("Incidence Rw","Kappa RW"))
+knot_rw_poiss_out_neg$combined_plot
+knot_rw_poiss_out_neg$rate_plot
+knot_rw_poiss_out_neg$incid_plot + coord_cartesian(ylim = NULL)
+#### splines only 
+
+knot_neg_sps <- optims_knot_neg[5:6]
+knot_sp_neg_out <- plot_undiagnosed(knot_neg_sps, model_labs = c("Incidence spline","Kappa spline"))
+knot_sp_neg_out$combined_plot
+knot_sp_neg_out$rate_plot
+knot_sp_neg_out$incid_plot + coord_cartesian(ylim = NULL, xlim = c(1970,2016))
+##### splines and RWs only 
+
+knot_neg_sps_rws <- optims_knot_neg[3:6]
+knot_neg_sps_rws_out <- plot_undiagnosed(knot_neg_sps_rws, model_labs = c("Incidence RW", "Kappa RW",
+                                                                              "Incidence spline", "kappa spline"))
+
+knot_neg_sps_rws_out$combined_plot
+knot_neg_sps_rws_out$rate
+knot_neg_sps_rws_out$incid_plot + coord_cartesian(ylim = c(0,0.001), xlim = c(1970,2016))
+###############################################################################################
+## Let's run a cheeky IMIS for our splines models #############################################
+###############################################################################################
+load("C:/Users/josh/Dropbox/hiv_project/jeff_eppasm_data/updated_brazil_fp_csavrd", verbose = T)
+brazil$fp$incid_func <- "NULL"
+brazil$fp$neg_binom <- FALSE
+brazil$fp$linear_diagnosis <- "spline"
+
+brazil_fit1_kappa_RW_spline_diag <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrw", B0=1e4,
+                                                                B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                   name = "log_RW_IMIS_fit_spline_diag_poiss")
+
+brazil_fit1_kappa_RW_spline_diag$log()
+brazil_fit1_kappa_RW_spline_diag$status()
+brazil_fit1_kappa_RW_spline_diag_id <- brazil_fit1_kappa_RW_spline_diag$id
+save(brazil_fit1_kappa_RW_spline_diag_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/spline_diag_RW_kappa_poiss")
+
+
+brazil_fit2_incid_RW_spline_diag_poiss <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logrw",
+                                                                B0=1e5, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                   name = "RW_incid_IMIS_spline_diag_poiss")
+brazil_fit2_incid_RW_spline_diag_poiss$status()
+brazil_fit2_incid_RW_spline_diag_poiss$log()
+brazil_fit2_incid_RW_spline_diag_poiss_id <- brazil_fit2_incid_RW_spline_diag_poiss$id
+save(brazil_fit2_incid_RW_spline_diag_poiss_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/spline_diag_RW_incid_poiss")
+
+
+## fit logistic model for transimssion rate (r(t))
+brazil_fit3_kappa_spline_spline_diag_poiss <- obj$enqueue(fitmod_csavr(brazil, eppmod="logrspline",
+                                                                       B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                   name = "spline_kappa_IMIS_spline_diag_poiss")
+brazil_fit3_kappa_spline_spline_diag_poiss$status()
+brazil_fit3_kappa_spline_spline_diag_poiss$log()
+brazil_fit3_kappa_spline_spline_diag_poiss_id <- brazil_fit3_kappa_spline_spline_diag_poiss$id
+save(brazil_fit3_kappa_spline_spline_diag_poiss_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/spline_diag_spline_kappa_poiss")
+
+brazil_fit4_incid_spline_spline_diag_poiss <- obj$enqueue(fitmod_csavr(brazil, incid_func="incid_logspline",
+                                                                       B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                          name = "spline_incid_IMIS_spline_diag_poiss")
+brazil_fit4_incid_spline_spline_diag_poiss$status()
+brazil_fit4_incid_spline_spline_diag_poiss$log()
+brazil_fit4_incid_spline_spline_diag_poiss_id <- brazil_fit4_incid_spline_spline_diag_poiss$id
+save(brazil_fit4_incid_spline_spline_diag_poiss_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/spline_diag_spline_incid_poiss")
+
+##########################################################################################################
+## Lets run it with a knot linear diagnosis rate #########################################################
+##########################################################################################################
+brazil$fp$neg_binom <- FALSE
+brazil$fp$linear_diagnosis <- "knot_linear"
+
+brazil_fit1_kappa_RW_knot_diag <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrw", B0=1e4,
+                                                             B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                name = "log_RW_IMIS_fit_knot_diag_poiss")
+
+brazil_fit1_kappa_RW_knot_diag$log()
+brazil_fit1_kappa_RW_knot_diag$status()
+brazil_fit1_kappa_RW_knot_diag_id <- brazil_fit1_kappa_RW_knot_diag$id
+save(brazil_fit1_kappa_RW_knot_diag_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/knot_diag_RW_kappa_poiss")
+
+
+brazil_fit2_incid_RW_knot_diag_poiss <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logrw",
+                                                                   B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                      name = "RW_incid_IMIS_knot_diag_poiss")
+brazil_fit2_incid_RW_knot_diag_poiss$status()
+brazil_fit2_incid_RW_knot_diag_poiss$log()
+brazil_fit2_incid_RW_knot_diag_poiss_id <- brazil_fit2_incid_RW_knot_diag_poiss$id
+save(brazil_fit2_incid_RW_knot_diag_poiss_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/knot_diag_RW_incid_poiss")
+
+
+## fit logistic model for transimssion rate (r(t))
+brazil_fit3_kappa_spline_knot_diag_poiss <- obj$enqueue(fitmod_csavr(brazil, eppmod="logrspline",
+                                                                       B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                          name = "spline_kappa_IMIS_knot_diag_poiss")
+brazil_fit3_kappa_spline_knot_diag_poiss$status()
+brazil_fit3_kappa_spline_knot_diag_poiss$log()
+brazil_fit3_kappa_spline_knot_diag_poiss_id <- brazil_fit3_kappa_spline_knot_diag_poiss$id
+save(brazil_fit3_kappa_spline_knot_diag_poiss_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/knot_diag_spline_kappa_poiss")
+
+brazil_fit4_incid_spline_knot_diag_poiss <- obj$enqueue(fitmod_csavr(brazil, incid_func="incid_logspline",
+                                                                       B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                          name = "spline_incid_IMIS_knot_diag_poiss")
+brazil_fit4_incid_spline_knot_diag_poiss$status()
+brazil_fit4_incid_spline_knot_diag_poiss$log()
+brazil_fit4_incid_spline_knot_diag_poiss_id <- brazil_fit4_incid_spline_knot_diag_poiss$id
+save(brazil_fit4_incid_spline_knot_diag_poiss_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/knot_diag_spline_incid_poiss")
+
+#######################################################################################
+## Now lets run both with the negative binomial likelihoods ###########################
+#######################################################################################
+brazil$fp$neg_binom <- TRUE
+brazil$fp$linear_diagnosis <- "spline"
+
+brazil_fit1_kappa_RW_spline_diag_binom <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrw", B0=1e4,
+                                                             B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                name = "log_RW_IMIS_fit_spline_diag_binom")
+
+brazil_fit1_kappa_RW_spline_diag_binom$log()
+brazil_fit1_kappa_RW_spline_diag_binom$status()
+brazil_fit1_kappa_RW_spline_diag_binom_id <- brazil_fit1_kappa_RW_spline_diag_binom$id
+save(brazil_fit1_kappa_RW_spline_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/spline_diag_RW_kappa_binom")
+
+
+brazil_fit2_incid_RW_spline_diag_binom <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logrw",
+                                                                   B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                      name = "RW_incid_IMIS_spline_diag_binom")
+brazil_fit2_incid_RW_spline_diag_binom$status()
+brazil_fit2_incid_RW_spline_diag_binom$log()
+brazil_fit2_incid_RW_spline_diag_binom_id <- brazil_fit2_incid_RW_spline_diag_binom$id
+save(brazil_fit2_incid_RW_spline_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/spline_diag_RW_incid_binom")
+
+
+## fit logistic model for transimssion rate (r(t))
+brazil_fit3_kappa_spline_spline_diag_binom <- obj$enqueue(fitmod_csavr(brazil, eppmod="logrspline",
+                                                                       B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                          name = "spline_kappa_IMIS_spline_diag_binom")
+brazil_fit3_kappa_spline_spline_diag_binom$status()
+brazil_fit3_kappa_spline_spline_diag_binom$log()
+brazil_fit3_kappa_spline_spline_diag_binom_id <- brazil_fit3_kappa_spline_spline_diag_binom$id
+save(brazil_fit3_kappa_spline_spline_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/spline_diag_spline_kappa_binom")
+
+brazil_fit4_incid_spline_spline_diag_binom <- obj$enqueue(fitmod_csavr(brazil, incid_func="incid_logspline",
+                                                                       B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                          name = "spline_incid_IMIS_spline_diag_binom")
+brazil_fit4_incid_spline_spline_diag_binom$status()
+brazil_fit4_incid_spline_spline_diag_binom$log()
+brazil_fit4_incid_spline_spline_diag_binom_id <- brazil_fit4_incid_spline_spline_diag_binom$id
+save(brazil_fit4_incid_spline_spline_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/spline_diag_spline_incid_binom")
+
+##########################################################################################################
+## Lets run it with a knot linear diagnosis rate #########################################################
+##########################################################################################################
+brazil$fp$neg_binom <- TRUE
+brazil$fp$linear_diagnosis <- "knot_linear"
+
+brazil_fit1_kappa_RW_knot_diag_binom <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrw", B0=1e4,
+                                                           B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                              name = "log_RW_IMIS_fit_knot_diag_binom")
+
+brazil_fit1_kappa_RW_knot_diag_binom$log()
+brazil_fit1_kappa_RW_knot_diag_binom$status()
+brazil_fit1_kappa_RW_knot_diag_binom_id <- brazil_fit1_kappa_RW_knot_diag_binom$id
+save(brazil_fit1_kappa_RW_knot_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/knot_diag_RW_kappa_binom")
+
+
+brazil_fit2_incid_RW_knot_diag_binom <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logrw",
+                                                                 B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                    name = "RW_incid_IMIS_knot_diag_binom")
+brazil_fit2_incid_RW_knot_diag_binom$status()
+brazil_fit2_incid_RW_knot_diag_binom$log()
+brazil_fit2_incid_RW_knot_diag_binom_id <- brazil_fit2_incid_RW_knot_diag_binom$id
+save(brazil_fit2_incid_RW_knot_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/knot_diag_RW_incid_binom")
+
+
+## fit logistic model for transimssion rate (r(t))
+brazil_fit3_kappa_spline_knot_diag_binom <- obj$enqueue(fitmod_csavr(brazil, eppmod="logrspline",
+                                                                     B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                        name = "spline_kappa_IMIS_knot_diag_binom")
+brazil_fit3_kappa_spline_knot_diag_binom$status()
+brazil_fit3_kappa_spline_knot_diag_binom$log()
+brazil_fit3_kappa_spline_knot_diag_binom_id <- brazil_fit3_kappa_spline_knot_diag_binom$id
+save(brazil_fit3_kappa_spline_knot_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/knot_diag_spline_kappa_binom")
+
+brazil_fit4_incid_spline_knot_diag_binom <- obj$enqueue(fitmod_csavr(brazil, incid_func="incid_logspline",
+                                                                     B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                        name = "spline_incid_IMIS_knot_diag_binom")
+brazil_fit4_incid_spline_knot_diag_binom$status()
+brazil_fit4_incid_spline_knot_diag_binom$log()
+brazil_fit4_incid_spline_knot_diag_binom_id <- brazil_fit4_incid_spline_knot_diag_binom$id
+save(brazil_fit4_incid_spline_knot_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/knot_diag_spline_incid_binom")
+
+
+####################################################################################
+## Load up and plot results ########################################################
+####################################################################################
+
+
+path_to_victory <- "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_2_8_2018/"
+minor_slip_up <- list.files(path_to_victory, full.names = TRUE)
+for(i in 1:length(minor_slip_up))
+  load(minor_slip_up[[i]], verbose = TRUE)
+
+######### Splines diag, poisson likelihood ############ 
+
+brazil_fit1 <- obj$task_get(brazil_fit1_kappa_RW_spline_diag_id)
+brazil_fit2 <- obj$task_get(brazil_fit2_incid_RW_spline_diag_poiss_id)
+brazil_fit3 <- obj$task_get(brazil_fit3_kappa_spline_spline_diag_poiss_id)
+brazil_fit4 <- obj$task_get(brazil_fit4_incid_spline_spline_diag_poiss_id)
+
+imis_kappa_RW <- brazil_fit1$result()
+imis_incid_RW <- brazil_fit2$result()
+imis_kappa_spline <- brazil_fit3$result()
+imis_incid_spline <- brazil_fit4$result()
+
+results_list_poiss_spline <- list(imis_kappa_RW, imis_incid_RW, imis_kappa_spline, imis_incid_spline)
+save(results_list_poiss_spline,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_results/IMIS_2_8_2018/poiss_spline_diag")
+
+brazil_out1_cd4 <- tidy(imis_kappa_RW) %>% data.frame(model = "Kappa RW", .)
+brazil_out2_cd4 <- tidy(imis_incid_RW) %>% data.frame(model = "Incid RW", .)
+brazil_out3_cd4 <- tidy(imis_kappa_spline) %>% data.frame(model = "Kappa Spline", .)
+brazil_out4_cd4 <- tidy(imis_incid_spline) %>% data.frame(model = "Incid Spline", .)
+brazil_out_cd4 <- rbind(brazil_out1_cd4, brazil_out2_cd4,
+                        brazil_out3_cd4, brazil_out4_cd4)
+
+
+
+spline_linear_diag_plot <- ggplot(subset(brazil_out_cd4, year %in% 1975:2015), 
+                                aes(year, mean, ymin=lower, ymax=upper, color=model, fill=model)) +
+  geom_line(size=1.05) + geom_ribbon(alpha=0.2) + 
+  facet_wrap(~outcome, scales="free") +
+  geom_point(aes(y=lik_data), col="darkred", size=0.5) +
+  labs(title = "Spline diagnosis, Poisson likelihood, RW spline comparison")
+
+##################### Knot linear poiss compo #########################
+brazil_fit1 <- obj$task_get(brazil_fit1_kappa_RW_knot_diag_id)
+brazil_fit2 <- obj$task_get(brazil_fit2_incid_RW_knot_diag_poiss_id)
+brazil_fit3 <- obj$task_get(brazil_fit3_kappa_spline_knot_diag_poiss_id)
+brazil_fit4 <- obj$task_get(brazil_fit4_incid_spline_knot_diag_poiss_id)
+
+imis_kappa_RW <- brazil_fit1$result()
+imis_incid_RW <- brazil_fit2$result()
+imis_kappa_spline <- brazil_fit3$result()
+imis_incid_spline <- brazil_fit4$result()
+
+results_list_poiss_knot <- list(imis_kappa_RW, imis_incid_RW, imis_kappa_spline, imis_incid_spline)
+save(results_list_poiss_knot,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_results/IMIS_2_8_2018/poiss_knot_diag")
+
+
+brazil_out1_cd4 <- tidy(imis_kappa_RW) %>% data.frame(model = "Kappa RW", .)
+brazil_out2_cd4 <- tidy(imis_incid_RW) %>% data.frame(model = "Incid RW", .)
+brazil_out3_cd4 <- tidy(imis_kappa_spline) %>% data.frame(model = "Kappa Spline", .)
+brazil_out4_cd4 <- tidy(imis_incid_spline) %>% data.frame(model = "Incid Spline", .)
+brazil_out_cd4 <- rbind(brazil_out1_cd4, brazil_out2_cd4, brazil_out3_cd4, brazil_out4_cd4)
+                                                          
+                                                          
+                                                          
+knot_linear_diag_plot <- ggplot(subset(brazil_out_cd4, year %in% 1975:2017), 
+                                aes(year, mean, ymin=lower, ymax=upper, color=model, fill=model)) +
+                                geom_line(size=1.05) + geom_ribbon(alpha=0.2) + 
+                                facet_wrap(~outcome, scales="free") +
+                                geom_point(aes(y=lik_data), col="darkred", size=0.5) +
+                          labs(title = "Knot diagnosis, Poisson likelihood, RW spline comparison")
+                                                          
+                                                          
+############### spline diag binom likelihood ############################
+brazil_fit1 <- obj$task_get(brazil_fit1_kappa_RW_spline_diag_binom_id)
+brazil_fit2 <- obj$task_get(brazil_fit2_incid_RW_spline_diag_binom_id)
+brazil_fit3 <- obj$task_get(brazil_fit3_kappa_spline_spline_diag_binom_id)
+brazil_fit4 <- obj$task_get(brazil_fit4_incid_spline_spline_diag_binom_id)
+
+imis_kappa_RW <- brazil_fit1$result()
+imis_incid_RW <- brazil_fit2$result()
+imis_kappa_spline <- brazil_fit3$result()
+imis_incid_spline <- brazil_fit4$result()
+
+results_list_neg_spline <- list(imis_kappa_RW, imis_incid_RW, imis_kappa_spline, imis_incid_spline)
+save(results_list_neg_spline,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_results/IMIS_2_8_2018/negBinom_spline_diag")
+
+
+brazil_out1_cd4 <- tidy(imis_kappa_RW) %>% data.frame(model = "Kappa RW", .)
+brazil_out2_cd4 <- tidy(imis_incid_RW) %>% data.frame(model = "Incid RW", .)
+brazil_out3_cd4 <- tidy(imis_kappa_spline) %>% data.frame(model = "Kappa Spline", .)
+brazil_out4_cd4 <- tidy(imis_incid_spline) %>% data.frame(model = "Incid Spline", .)
+brazil_out_cd4 <- rbind(brazil_out1_cd4, brazil_out2_cd4, brazil_out3_cd4, brazil_out4_cd4)
+                                                          
+                                                          
+                                                          
+spline_linear_diag_plot_binomial <- ggplot(subset(brazil_out_cd4, year %in% 1975:2017), 
+                          aes(year, mean, ymin=lower, ymax=upper, color=model, fill=model)) +
+                          geom_line(size=1.05) + geom_ribbon(alpha=0.15) + 
+                          facet_wrap(~outcome, scales="free") +
+                          geom_point(aes(y=lik_data), col="darkred", size=0.5) +
+                          labs(title = "Spline diagnosis, Negative Binomial likelihood, RW spline comparison")
+                                                          
+                                                          
+############### knot diag binom likelihood ##############################
+
+brazil_fit1 <- obj$task_get(brazil_fit1_kappa_RW_knot_diag_binom_id)
+brazil_fit2 <- obj$task_get(brazil_fit2_incid_RW_knot_diag_binom_id)
+brazil_fit3 <- obj$task_get(brazil_fit3_kappa_spline_knot_diag_binom_id)
+brazil_fit4 <- obj$task_get(brazil_fit4_incid_spline_knot_diag_binom_id)
+
+imis_kappa_RW <- brazil_fit1$result()
+imis_incid_RW <- brazil_fit2$result()
+imis_kappa_spline <- brazil_fit3$result()
+imis_incid_spline <- brazil_fit4$result()
+
+results_list_neg_knot <- list(imis_kappa_RW, imis_incid_RW, imis_kappa_spline, imis_incid_spline)
+save(results_list_neg_knot,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_results/IMIS_2_8_2018/negBinom_knot_diag")
+
+
+brazil_out1_cd4 <- tidy(imis_kappa_RW) %>% data.frame(model = "Kappa RW", .)
+brazil_out2_cd4 <- tidy(imis_incid_RW) %>% data.frame(model = "Incid RW", .)
+brazil_out3_cd4 <- tidy(imis_kappa_spline) %>% data.frame(model = "Kappa Spline", .)
+brazil_out4_cd4 <- tidy(imis_incid_spline) %>% data.frame(model = "Incid Spline", .)
+brazil_out_cd4 <- rbind(brazil_out1_cd4, brazil_out2_cd4, brazil_out3_cd4, brazil_out4_cd4)
+                                                          
+                                                          
+knot_linear_diag_plot_binomial <- ggplot(subset(brazil_out_cd4, year %in% 1975:2017), 
+                        aes(year, mean, ymin=lower, ymax=upper, color=model, fill=model)) +
+                        geom_line(size=1.05) + geom_ribbon(alpha=0.2) + 
+                        facet_wrap(~outcome, scales="free") +
+                        geom_point(aes(y=lik_data), col="darkred", size=0.5) +
+                        labs(title = "Knot diagnosis, Negative Binomial likelihood, RW spline comparison")
+                                                          
+                                                          
+                                                          
+knot_linear_diag_plot_binomial
+
+
+#####################################################################################################
+## Checking out the imis function for the RW on incid ###############################################
+#####################################################################################################
+
+devtools::load_all("C:/Users/josh/Dropbox/hiv_project/eppasm")
+brazil$fp$neg_binom <- FALSE
+brazil$fp$linear_diagnosis <- "spline"
+
+
+rw_incid_imis_test <- fitmod_csavr(brazil, incid_func = "incid_logrw",
+                                  B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5)
+
+rw_kappa_imis_test <- fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e4,
+                                   B = 1e3, B.re = 3e3, opt_iter = 1:3*5)
+
+brazil$fp$linear_diagnosis <- "knot_linear"
+rw_kappa_imis_test <- fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e3,
+                                   B = 1e3, B.re = 3e3, opt_iter = 1:3*5)
+brazil$fp$linear_diagnosis <- "gamma"
+rw_kappa_imis_test <- fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e3,
+                                   B = 1e3, B.re = 3e3, opt_iter = 1:3*5)
+
+#####################################################################################################
+## Greater length IMIS hopefully for CONVERGENCE ####################################################
+#####################################################################################################
+brazil$fp$neg_binom <- TRUE
+brazil$fp$linear_diagnosis <- "spline"
+
+brazil_fit1_kappa_RW_spline_diag_binom <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrw", B0=1e4,number_k = 3e3,
+                                                                   B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                      name = "log_RW_IMIS_fit_spline_diag_binom")
+
+brazil_fit1_kappa_RW_spline_diag_binom$log()
+brazil_fit1_kappa_RW_spline_diag_binom$status()
+brazil_fit1_kappa_RW_spline_diag_binom_id <- brazil_fit1_kappa_RW_spline_diag_binom$id
+save(brazil_fit1_kappa_RW_spline_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_3_8_2018/spline_diag_RW_kappa_binom")
+
+
+brazil_fit2_incid_RW_spline_diag_binom <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logrw", number_k = 3e3,
+                                                                   B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                      name = "RW_incid_IMIS_spline_diag_binom")
+brazil_fit2_incid_RW_spline_diag_binom$status()
+brazil_fit2_incid_RW_spline_diag_binom$log()
+brazil_fit2_incid_RW_spline_diag_binom_id <- brazil_fit2_incid_RW_spline_diag_binom$id
+save(brazil_fit2_incid_RW_spline_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_3_8_2018/spline_diag_RW_incid_binom")
+
+
+## fit logistic model for transimssion rate (r(t))
+brazil_fit3_kappa_spline_spline_diag_binom <- obj$enqueue(fitmod_csavr(brazil, eppmod="logrspline",number_k = 3e3,
+                                                                       B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                          name = "spline_kappa_IMIS_spline_diag_binom")
+brazil_fit3_kappa_spline_spline_diag_binom$status()
+brazil_fit3_kappa_spline_spline_diag_binom$log()
+brazil_fit3_kappa_spline_spline_diag_binom_id <- brazil_fit3_kappa_spline_spline_diag_binom$id
+save(brazil_fit3_kappa_spline_spline_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_3_8_2018/spline_diag_spline_kappa_binom")
+
+brazil_fit4_incid_spline_spline_diag_binom <- obj$enqueue(fitmod_csavr(brazil, incid_func="incid_logspline", number_k = 3e3,
+                                                                       B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                          name = "spline_incid_IMIS_spline_diag_binom")
+brazil_fit4_incid_spline_spline_diag_binom$status()
+brazil_fit4_incid_spline_spline_diag_binom$log()
+brazil_fit4_incid_spline_spline_diag_binom_id <- brazil_fit4_incid_spline_spline_diag_binom$id
+save(brazil_fit4_incid_spline_spline_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_3_8_2018/spline_diag_spline_incid_binom")
+
+##########################################################################################################
+## Lets run it with a knot linear diagnosis rate #########################################################
+##########################################################################################################
+brazil$fp$neg_binom <- TRUE
+brazil$fp$linear_diagnosis <- "knot_linear"
+
+brazil_fit1_kappa_RW_knot_diag_binom <- obj$enqueue(fitmod_csavr(brazil, eppmod = "logrw", B0=1e4, number_k = 3e3,
+                                                                 B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                    name = "log_RW_IMIS_fit_knot_diag_binom")
+
+brazil_fit1_kappa_RW_knot_diag_binom$log()
+brazil_fit1_kappa_RW_knot_diag_binom$status()
+brazil_fit1_kappa_RW_knot_diag_binom_id <- brazil_fit1_kappa_RW_knot_diag_binom$id
+save(brazil_fit1_kappa_RW_knot_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_3_8_2018/knot_diag_RW_kappa_binom")
+
+
+brazil_fit2_incid_RW_knot_diag_binom <- obj$enqueue(fitmod_csavr(brazil, incid_func = "incid_logrw", number_k = 3e3,
+                                                                 B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                    name = "RW_incid_IMIS_knot_diag_binom")
+brazil_fit2_incid_RW_knot_diag_binom$status()
+brazil_fit2_incid_RW_knot_diag_binom$log()
+brazil_fit2_incid_RW_knot_diag_binom_id <- brazil_fit2_incid_RW_knot_diag_binom$id
+save(brazil_fit2_incid_RW_knot_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_3_8_2018/knot_diag_RW_incid_binom")
+
+
+## fit logistic model for transimssion rate (r(t))
+brazil_fit3_kappa_spline_knot_diag_binom <- obj$enqueue(fitmod_csavr(brazil, eppmod="logrspline", number_k = 3e3,
+                                                                     B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                        name = "spline_kappa_IMIS_knot_diag_binom")
+brazil_fit3_kappa_spline_knot_diag_binom$status()
+brazil_fit3_kappa_spline_knot_diag_binom$log()
+brazil_fit3_kappa_spline_knot_diag_binom_id <- brazil_fit3_kappa_spline_knot_diag_binom$id
+save(brazil_fit3_kappa_spline_knot_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_3_8_2018/knot_diag_spline_kappa_binom")
+
+brazil_fit4_incid_spline_knot_diag_binom <- obj$enqueue(fitmod_csavr(brazil, incid_func="incid_logspline", number_k = 3e3,
+                                                                     B0=1e4, B=1e3, B.re=3e3, opt_iter=1:3*5),
+                                                        name = "spline_incid_IMIS_knot_diag_binom")
+brazil_fit4_incid_spline_knot_diag_binom$status()
+brazil_fit4_incid_spline_knot_diag_binom$log()
+brazil_fit4_incid_spline_knot_diag_binom_id <- brazil_fit4_incid_spline_knot_diag_binom$id
+save(brazil_fit4_incid_spline_knot_diag_binom_id,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_3_8_2018/knot_diag_spline_incid_binom")
+
+###################################################################################
+## Loading up the cluster results #################################################
+###################################################################################
+
+Bernd_leno <- "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_ids/IMIS_3_8_2018/"
+Guendozi <- list.files(Bernd_leno, full.names = TRUE)
+for(i in 1:length(Guendozi))
+  load(Guendozi[[i]], verbose = TRUE)
+
+############### spline diag binom likelihood ############################
+brazil_fit1 <- obj$task_get(brazil_fit1_kappa_RW_spline_diag_binom_id)
+brazil_fit2 <- obj$task_get(brazil_fit2_incid_RW_spline_diag_binom_id)
+brazil_fit3 <- obj$task_get(brazil_fit3_kappa_spline_spline_diag_binom_id)
+brazil_fit4 <- obj$task_get(brazil_fit4_incid_spline_spline_diag_binom_id)
+
+imis_kappa_RW <- brazil_fit1$result()
+imis_incid_RW <- brazil_fit2$result()
+imis_kappa_spline <- brazil_fit3$result()
+imis_incid_spline <- brazil_fit4$result()
+
+results_list_neg_spline <- list(imis_kappa_RW, imis_incid_RW, imis_kappa_spline, imis_incid_spline)
+save(results_list_neg_spline,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_results/IMIS_2_8_2018/negBinom_spline_diag")
+
+
+brazil_out1_cd4 <- tidy(imis_kappa_RW) %>% data.frame(model = "Kappa RW", .)
+brazil_out2_cd4 <- tidy(imis_incid_RW) %>% data.frame(model = "Incid RW", .)
+brazil_out3_cd4 <- tidy(imis_kappa_spline) %>% data.frame(model = "Kappa Spline", .)
+brazil_out4_cd4 <- tidy(imis_incid_spline) %>% data.frame(model = "Incid Spline", .)
+brazil_out_cd4 <- rbind(brazil_out1_cd4, brazil_out2_cd4, brazil_out3_cd4, brazil_out4_cd4)
+
+
+
+spline_linear_diag_plot_binomial <- ggplot(subset(brazil_out_cd4, year %in% 1975:2017), 
+                                           aes(year, mean, ymin=lower, ymax=upper, color=model, fill=model)) +
+  geom_line(size=1.05) + geom_ribbon(alpha=0.15) + 
+  facet_wrap(~outcome, scales="free") +
+  geom_point(aes(y=lik_data), col="darkred", size=0.5) +
+  labs(title = "Spline diagnosis, Negative Binomial likelihood, RW spline comparison")
+
+
+############### knot diag binom likelihood ##############################
+
+brazil_fit1 <- obj$task_get(brazil_fit1_kappa_RW_knot_diag_binom_id)
+brazil_fit2 <- obj$task_get(brazil_fit2_incid_RW_knot_diag_binom_id)
+brazil_fit3 <- obj$task_get(brazil_fit3_kappa_spline_knot_diag_binom_id)
+brazil_fit4 <- obj$task_get(brazil_fit4_incid_spline_knot_diag_binom_id)
+
+imis_kappa_RW <- brazil_fit1$result()
+imis_incid_RW <- brazil_fit2$result()
+imis_kappa_spline <- brazil_fit3$result()
+imis_incid_spline <- brazil_fit4$result()
+
+results_list_neg_knot <- list(imis_kappa_RW, imis_incid_RW, imis_kappa_spline, imis_incid_spline)
+save(results_list_neg_knot,
+     file = "C:/Users/josh/Dropbox/hiv_project/EPPASM_runs/cluster_runs/cluster_results/IMIS_2_8_2018/negBinom_knot_diag")
+
+
+brazil_out1_cd4 <- tidy(imis_kappa_RW) %>% data.frame(model = "Kappa RW", .)
+brazil_out2_cd4 <- tidy(imis_incid_RW) %>% data.frame(model = "Incid RW", .)
+brazil_out3_cd4 <- tidy(imis_kappa_spline) %>% data.frame(model = "Kappa Spline", .)
+brazil_out4_cd4 <- tidy(imis_incid_spline) %>% data.frame(model = "Incid Spline", .)
+brazil_out_cd4 <- rbind(brazil_out1_cd4, brazil_out2_cd4, brazil_out3_cd4, brazil_out4_cd4)
+
+
+knot_linear_diag_plot_binomial <- ggplot(subset(brazil_out_cd4, year %in% 1975:2017), 
+                                         aes(year, mean, ymin=lower, ymax=upper, color=model, fill=model)) +
+  geom_line(size=1.05) + geom_ribbon(alpha=0.2) + 
+  facet_wrap(~outcome, scales="free") +
+  geom_point(aes(y=lik_data), col="darkred", size=0.5) +
+  labs(title = "Knot diagnosis, Negative Binomial likelihood, RW spline comparison")
+
+
+
+knot_linear_diag_plot_binomial
+
+
+####################################################################################
+## Now running a quick optim #######################################################
+#####################################################################################
+brazil$fp$neg_binom
+brazil$fp$linear_diagnosis <- "spline"
+
+devtools::load_all("C:/Users/josh/Dropbox/hiv_project/eppasm")
+
+test_optim_4_neg_rate_2 <- fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e4, optfit = TRUE)
+
+test_optim_4_neg_rate_3 <- fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e4, optfit = TRUE)
+
+test_optim_4_neg_rate_10 <- fitmod_csavr(brazil, eppmod = "logrw", B0 = 1e4, optfit = TRUE)                    
+
+optim_1 <- list(test_optim_4_neg,test_optim_4_neg_rate_2, test_optim_4_neg_rate_3, test_optim_4_neg_rate_10)
+
+testarossa <- plot_undiagnosed(optim_1, model_lab = c("logrw_rate_1","log_rw_rate2","log_rw_rate_3", "log_rw_rate_10"))
+
+for(i in 1:length(optim_1))
+  print(optim_1[[i]]$par[55:57])
 
 

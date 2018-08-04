@@ -213,4 +213,4 @@ qbeta()
 which(step_vector == 2015)#,2001,2009,2015))
 
 
-
+knot_neg_sps_rws_out$incid_plot + coord_cartesian(ylim = c(0,0.001), xlim = c(1970,2016))

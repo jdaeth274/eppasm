@@ -131,7 +131,7 @@ spline_diagn_rate <- function(knot_params, fp){
   Xsp <- splines::splineDesign(knots, step_vector , ord=4)
   Dsp1 <- diff(diag(nk), diff=1)
   
-  betas <- c(0,0,knot_params)
+  betas <- c(0,0,exp(knot_params))
   
   out <- Xsp %*% betas
   
@@ -480,8 +480,8 @@ diagn_linear_theta_sd <- rep(0.5,12)
 diagn_knot_linear_mean <- c(0.1, 0.5, 3, 6, 9, 15)
 diagn_knot_linear_sd <- c(0.05, 0.2, 1, 3, 2, 2.5)
 
-spline_diagn_mean <- c(0.001, 0.1, 0.5, 3, 6, 9, 15)
-spline_diagn_sd <- c(0.01, 0.05, 0.2, 1, 3, 2, 2.5)
+spline_diagn_mean <- log(c(0.1, 0.1, 0.5, 3, 6, 9, 15))
+spline_diagn_sd <- c(2, 2, 1, 1, 3, 2, 2.5)
 
 logiota_pr_mean <- -13
 logiota_pr_sd <- 5
@@ -490,7 +490,7 @@ phi_mean <- c(10,10)
 phi_sd <- c(5,5)
 
 sample_prior_csavr <- function(n, fp){
-
+  
   mat_eppmod <- sample_prior_eppmod(n, fp)
   if(fp$linear_diagnosis == "12 param"){
     mat_diagn <- sample_prior_piecewise_diagn(n, fp)
@@ -673,7 +673,7 @@ lprior_eppmod <- function(theta_eppmod, fp){
     return(lpr)
   }
   else if (fp$eppmod == "directincid" && fp$incid_func == "incid_logrw"){
-    lpr <- bayes_lmvt(theta_eppmod[2:fp$numKnots], rw_prior_shape, rw_prior_rate)
+    lpr <- bayes_lmvt(theta_eppmod[2:fp$numKnots], rw_incid_prior_shape, rw_incid_prior_rate)
     return(lpr)
   }
   else
@@ -716,7 +716,7 @@ get_nparam_eppmod <- function(fp){
   else if(fp$eppmod == "directincid" && fp$incid_func == "incid_logspline")
     return(fp$numKnots)
   else if(fp$eppmod == "rlogistic")
-    return(length(rlog_pr_mean))
+    return(length(rlog_pr_mean) + 1)
   else if(fp$eppmod %in% c("logrw", "logrspline"))
     return(fp$numKnots + 1L)
   else

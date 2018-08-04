@@ -35,7 +35,7 @@ tau2_prior_rate <- 0.001
 muSS <- 1/11.5               #1/duration for r steady state prior
 
 rw_prior_shape <- 300
-rw_prior_rate <- 1.0
+rw_prior_rate <- 10
 
 
 ## r-trend prior parameters
