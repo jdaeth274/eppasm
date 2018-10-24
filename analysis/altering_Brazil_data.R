@@ -5,7 +5,7 @@
 library(knitr)
 opts_chunk$set(tidy=TRUE, warning=FALSE, cache=TRUE, message=FALSE)
 options(knitr.kable.NA = '')
-library(eppasm)
+
 ## devtools::load_all("~/Documents/Code/R/eppasm-csavr/") # @csavr
 devtools::load_all("C:/Users/josh/Dropbox/hiv_project/eppasm")
 devtools::build("C:/Users/josh/Dropbox/hiv_project/eppasm")
