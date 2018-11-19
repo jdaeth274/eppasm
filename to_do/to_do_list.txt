@@ -1,0 +1,22 @@
+#############################################################################
+## Working on HIV stuff with Jeff ###########################################
+#############################################################################
+
+So I need to alter a couple of things for working with Jeff's stuff on the HIV
+work.
+
+1. Switch to a more flexible model for diagnosis rate, use a spline/RW
+   formulation for this. Even though I think the spline may be already
+   implemented in the current framework in CSVAR.
+
+2. Look at switching the death rates to a more flexible model as well. Can use
+   splines or RWs again for this. Currently the death rates are stable estimates
+   from the literature, input into the matrix from the Spectrum data file.
+
+   I could look to change this around. Have the input of this matrix be modelled
+   by a flexible function. Although this will probably significantly slow down
+   the run time for the model.
+
+
+## For installing all of Jeff's github packages I just used install_github, on
+## epp, it recognised the need for the dependcies and installed anclik for me!
