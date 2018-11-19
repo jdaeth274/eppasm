@@ -14,7 +14,7 @@ work.
    from the literature, input into the matrix from the Spectrum data file.
 
    I could look to change this around. Have the input of this matrix be modelled
-   by a flexible function. Although this will probably significantly slow down
+   by a flexible function. Although this might slow down
    the run time for the model.
 
 
