@@ -38,9 +38,18 @@ a$result()
 ###############################################################################
 
 devtools::load_all("~/Dropbox/jeff_hiv_work/eppasm")
-load("~/Dropbox/jeff_hiv_work/r_data/brazil_spectrum_file", verbose = T)
+load("~/Dropbox/jeff_hiv_work/eppasm/data/brazil_spectrum_file", verbose = T)
+
+###############################################################################
+## Some of the options with the Brazil fp object:                            ##                          
+## - neg_binom = True or F for poisson                                       ##
+## - diagnoses_uses = whether to use diags for loglk                         ##
+## - linear_diagnoses = choose the diag model, can have "knot_linear" model, ##
+##                      "spline" for 7 knot spline model or "gamma" for gamma #
+###############################################################################
 
 brazil$fp$linear_diagnosis
+
 brazil$fp$neg_binom <- FALSE
 
 local_test_optim <- fitmod_csavr(brazil, incid_func ="ilogistic", B0 = 1e4, optfit = TRUE)
